@@ -13,6 +13,7 @@ AI 编程题讲解机器人 - 主程序入口
 import os
 import sys
 import json
+import re
 import time
 import traceback
 
@@ -253,17 +254,42 @@ def search_leetcode(keyword: str, difficulty: str) -> tuple[list[list[str]], str
 
 def fill_slug_from_result(results: list[list[str]], evt: gr.SelectData) -> object:
     """点击检索结果表格时，把对应行的 Slug 填入输入框。"""
-    if not evt or evt.index is None:
-        return gr.update()
+    slug = ""
 
-    row_index = evt.index[0] if isinstance(evt.index, (list, tuple)) else evt.index
-    try:
-        row = results[row_index]
-        slug = row[4]
-    except (TypeError, IndexError):
-        slug = evt.value if isinstance(evt.value, str) else ""
+    if evt and isinstance(evt.value, str) and _looks_like_slug(evt.value):
+        slug = evt.value
 
-    return slug or gr.update()
+    if not slug and evt and evt.index is not None:
+        row_index = _extract_dataframe_row_index(evt.index)
+        if row_index is not None:
+            try:
+                row = results.iloc[row_index].tolist() if hasattr(results, "iloc") else results[row_index]
+                slug = str(row[4]) if len(row) > 4 else ""
+            except (TypeError, IndexError, KeyError, AttributeError):
+                slug = ""
+
+    return slug if slug else gr.update()
+
+
+def _extract_dataframe_row_index(index) -> int | None:
+    """Extract row index from the different shapes Gradio can emit."""
+    if isinstance(index, int):
+        return index
+    if isinstance(index, (list, tuple)) and index:
+        first = index[0]
+        return first if isinstance(first, int) else None
+    if isinstance(index, dict):
+        for key in ("row", "index"):
+            value = index.get(key)
+            if isinstance(value, int):
+                return value
+            if isinstance(value, (list, tuple)) and value and isinstance(value[0], int):
+                return value[0]
+    return None
+
+
+def _looks_like_slug(value: str) -> bool:
+    return bool(re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", value.strip()))
 
 
 def import_generated_variant(selected_variant: str, variants: list[dict], language: str) -> tuple[object, object, object, object, str]:
@@ -581,6 +607,7 @@ def build_ui():
                     value=[],
                     label="检索结果",
                     interactive=False,
+                    type="array",
                 )
                 leetcode_slug_input = gr.Textbox(
                     label="题目链接或 Slug",
