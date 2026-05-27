@@ -20,6 +20,12 @@ pip install -r requirements.txt
 
 ## 配置
 
+首次 clone 项目后，复制配置示例：
+
+```bash
+cp config.example.py config.py
+```
+
 建议通过环境变量配置 DeepSeek API Key：
 
 ```bash
