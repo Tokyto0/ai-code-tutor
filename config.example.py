@@ -20,7 +20,7 @@ SANDBOX_MAX_OUTPUT = 65536
 # ==================== Gradio 配置 ====================
 GRADIO_SERVER_NAME = "127.0.0.1"
 GRADIO_SERVER_PORT = 7860
-GRADIO_SHARE = True
+GRADIO_SHARE = os.getenv("GRADIO_SHARE", "false").lower() in ("1", "true", "yes", "on")
 GRADIO_THEME = "soft"
 GRADIO_TITLE = "AI 编程题讲解机器人"
 GRADIO_DESCRIPTION = "上传错解代码，AI 自动诊断错误并生成变式训练题"

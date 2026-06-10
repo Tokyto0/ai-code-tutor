@@ -62,3 +62,28 @@ bash run.sh
 ## 编程语言
 
 页面左侧可以选择编程语言。预设题会根据语言生成对应模板，LeetCode 导入会优先使用该语言的官方代码片段。当前 AST 结构分析和沙箱运行验证仅支持 Python3；选择其他语言时，系统会跳过这两步，并由大模型按所选语言给出诊断和修复代码。
+
+## 项目结构
+
+- `app.py`：Gradio 页面布局、事件绑定和启动入口。
+- `services/`：面向 UI 的业务服务，包含诊断流程、LeetCode 导入和变式题导入。
+- `ui/`：前端 CSS 和 JavaScript 资源。
+- `analyzer/`：AST 分析、LLM 诊断和沙箱运行能力。
+- `database/`：本地题库与 LeetCode 在线题库客户端。
+- `generator/`：变式训练题生成。
+- `utils/`：语言映射、日志和 Markdown 报告构建。
+- `tests/`：基础回归测试和 UI 构建烟雾测试。
+
+## 测试
+
+安装依赖后运行：
+
+```bash
+python -m pytest
+```
+
+也可以先运行语法/导入检查：
+
+```bash
+python -m compileall app.py config.example.py ui services analyzer database generator utils tests
+```
