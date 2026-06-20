@@ -157,12 +157,16 @@ def build_ui():
                         with gr.Row():
                             test_input = gr.Textbox(
                                 label="测试输入",
-                                placeholder="例：nums=[2,7,11,15], target=9",
+                                placeholder="单组：nums=[2,7,11,15], target=9；多组导入后按“测试用例 N”分组",
+                                lines=6,
+                                max_lines=12,
                                 scale=1,
                             )
                             test_expected = gr.Textbox(
                                 label="期望输出",
-                                placeholder="例：[0,1]",
+                                placeholder="单组：[0,1]；多组导入后按“期望输出 N”分组",
+                                lines=6,
+                                max_lines=12,
                                 scale=1,
                             )
 

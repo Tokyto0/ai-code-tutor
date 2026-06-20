@@ -11,6 +11,7 @@ from analyzer.sandbox import SandboxRunner
 from config import REPORT_INCLUDE_AST, REPORT_INCLUDE_SANDBOX, REPORT_INCLUDE_VARIANT
 from generator.variant import VariantGenerator
 from services.history_service import save_report_history
+from services.test_case_service import parse_test_cases
 from services.variant_service import _format_variant_choice, _normalize_variants
 from utils.languages import is_python_language
 from utils.logger import setup_logger
@@ -121,18 +122,28 @@ def _run_diagnosis_with_dependencies(
             )
             status_parts.append(f"已跳过 AST（{language}）")
 
-    # 构造测试用例
-    test_cases = []
-    if test_input.strip() and test_expected.strip():
-        test_cases.append({"input": test_input, "expected": test_expected})
+    # 构造测试用例。多组测试按显式编号严格一一配对。
+    test_cases, test_case_error = parse_test_cases(test_input, test_expected)
 
     sandbox_results = []
 
     # ------------------------------------------------------------------
     # 第 2 步：沙箱运行验证
     # ------------------------------------------------------------------
-    if REPORT_INCLUDE_SANDBOX and test_cases:
-        if is_python_language(language):
+    if REPORT_INCLUDE_SANDBOX:
+        if test_case_error:
+            builder.add_sandbox_results(
+                [],
+                skipped_reason=f"测试用例格式错误：{test_case_error} 已跳过沙箱验证。",
+            )
+            status_parts.append(f"已跳过沙箱（{test_case_error}）")
+        elif not test_cases:
+            builder.add_sandbox_results(
+                [],
+                skipped_reason="未提供完整测试用例：需要同时填写测试输入和期望输出，因此已跳过沙箱验证。",
+            )
+            status_parts.append("已跳过沙箱（未提供完整测试用例）")
+        elif is_python_language(language):
             try:
                 results = deps.sandbox_runner.run_tests(
                     code=code,

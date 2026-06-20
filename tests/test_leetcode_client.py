@@ -1,6 +1,6 @@
 import requests
 
-from database.leetcode_client import LeetCodeClient
+from database.leetcode_client import LeetCodeClient, _extract_examples, html_to_markdown
 
 
 class FakeResponse:
@@ -181,3 +181,151 @@ def test_format_problem_names_raw_testcase_values_from_python_signature():
     problem = client._format_problem(question, "https://leetcode.cn/graphql/", "python3")
 
     assert problem["examples"] == [{"input": "nums1 = [1,3]\nnums2 = [2]", "output": ""}]
+
+
+def test_extract_examples_handles_markdown_wrapped_statement_labels():
+    description = html_to_markdown(
+        """
+        <p><strong>Example 1:</strong></p>
+        <pre>
+        <strong>Input:</strong> nums = [2,7,11,15], target = 9
+        <strong>Output:</strong> <code>[0,1]</code>
+        <strong>Explanation:</strong> Return the matching indexes.
+        </pre>
+        """
+    )
+
+    examples = _extract_examples(
+        "[2,7,11,15]\n9",
+        description=description,
+        starter_code=(
+            "class Solution:\n"
+            "    def twoSum(self, nums: list[int], target: int) -> list[int]:\n"
+            "        pass"
+        ),
+    )
+
+    assert examples == [
+        {
+            "input": "nums = [2,7,11,15]\ntarget = 9",
+            "output": "[0,1]",
+        }
+    ]
+
+
+def test_extract_examples_uses_raw_testcases_for_multiple_complex_inputs():
+    description = html_to_markdown(
+        """
+        <p><strong>Example 1:</strong></p>
+        <pre><strong>Input:</strong> matrix = [[1,2],[3,4]], word = "ab"
+        <strong>Output:</strong> true</pre>
+        <p><strong>Example 2:</strong></p>
+        <pre><strong>Input:</strong> matrix = [[5]], word = "z"
+        <strong>Output:</strong> false</pre>
+        """
+    )
+
+    examples = _extract_examples(
+        '[[1,2],[3,4]]\n"ab"\n[[5]]\n"z"',
+        description=description,
+        starter_code=(
+            "class Solution:\n"
+            "    def exist(self, matrix: list[list[int]], word: str) -> bool:\n"
+            "        pass"
+        ),
+    )
+
+    assert examples == [
+        {
+            "input": 'matrix = [[1,2],[3,4]]\nword = "ab"',
+            "output": "true",
+        },
+        {
+            "input": 'matrix = [[5]]\nword = "z"',
+            "output": "false",
+        },
+    ]
+
+
+def test_extract_regex_matching_examples_as_three_independent_pairs():
+    description = html_to_markdown(
+        """
+        <p><strong>Example 1:</strong></p>
+        <pre><strong>Input:</strong> s = "aa", p = "a"
+        <strong>Output:</strong> false</pre>
+        <p><strong>Example 2:</strong></p>
+        <pre><strong>Input:</strong> s = "aa", p = "a*"
+        <strong>Output:</strong> true</pre>
+        <p><strong>Example 3:</strong></p>
+        <pre><strong>Input:</strong> s = "ab", p = ".*"
+        <strong>Output:</strong> true</pre>
+        """
+    )
+
+    examples = _extract_examples(
+        '"aa"\n"a"\n"aa"\n"a*"\n"ab"\n".*"',
+        description=description,
+        starter_code=(
+            "class Solution:\n"
+            "    def isMatch(self, s: str, p: str) -> bool:\n"
+            "        pass"
+        ),
+    )
+
+    assert examples == [
+        {"input": 's = "aa"\np = "a"', "output": "false"},
+        {"input": 's = "aa"\np = "a*"', "output": "true"},
+        {"input": 's = "ab"\np = ".*"', "output": "true"},
+    ]
+
+
+def test_extract_regex_examples_without_parseable_starter_code():
+    description = html_to_markdown(
+        """
+        <p><strong>Example 1:</strong></p>
+        <pre><strong>Input:</strong> s = "aa", p = "a"
+        <strong>Output:</strong> false</pre>
+        <p><strong>Example 2:</strong></p>
+        <pre><strong>Input:</strong> s = "aa", p = "a*"
+        <strong>Output:</strong> true</pre>
+        <p><strong>Example 3:</strong></p>
+        <pre><strong>Input:</strong> s = "ab", p = ".*"
+        <strong>Output:</strong> true</pre>
+        """
+    )
+
+    examples = _extract_examples(
+        '"aa"\n"a"\n"aa"\n"a*"\n"ab"\n".*"',
+        description=description,
+        starter_code="",
+    )
+
+    assert examples == [
+        {"input": 's = "aa"\np = "a"', "output": "false"},
+        {"input": 's = "aa"\np = "a*"', "output": "true"},
+        {"input": 's = "ab"\np = ".*"', "output": "true"},
+    ]
+
+
+def test_mismatched_raw_group_count_does_not_overwrite_statement_inputs():
+    description = html_to_markdown(
+        """
+        <p><strong>Example 1:</strong></p>
+        <pre><strong>Input:</strong> s = "aa", p = "a"
+        <strong>Output:</strong> false</pre>
+        <p><strong>Example 2:</strong></p>
+        <pre><strong>Input:</strong> s = "aa", p = "a*"
+        <strong>Output:</strong> true</pre>
+        """
+    )
+
+    examples = _extract_examples(
+        '"unexpected single raw value"',
+        description=description,
+        starter_code="",
+    )
+
+    assert examples == [
+        {"input": 's = "aa"\np = "a"', "output": "false"},
+        {"input": 's = "aa"\np = "a*"', "output": "true"},
+    ]

@@ -115,6 +115,16 @@ def test_load_leetcode_template_uses_first_parsed_example(monkeypatch):
     )
 
     assert code_update["value"].startswith("class Solution:")
-    assert test_in == "nums1 = [1,3]\nnums2 = [2]"
-    assert test_out == "2.00000"
+    assert test_in == (
+        "===== 测试用例 1 =====\n"
+        "nums1 = [1,3]\nnums2 = [2]\n\n"
+        "===== 测试用例 2 =====\n"
+        "nums1 = [1,2]\nnums2 = [3,4]"
+    )
+    assert test_out == (
+        "===== 期望输出 1 =====\n"
+        "2.00000\n\n"
+        "===== 期望输出 2 =====\n"
+        "2.50000"
+    )
     assert "寻找两个正序数组的中位数" in desc

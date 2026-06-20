@@ -484,17 +484,26 @@ def _extract_examples(
     starter_code: str = "",
 ) -> list[dict[str, str]]:
     """Extract UI-ready examples with named inputs and expected outputs."""
-    params = _extract_python_method_params(starter_code)
     description_examples = _extract_examples_from_description(description)
+    params = _extract_python_method_params(starter_code)
+    if not params and description_examples:
+        params = _infer_params_from_description_examples(description_examples)
+
     raw_examples = _extract_examples_from_raw_testcases(example_text, params)
 
     if description_examples:
-        if raw_examples:
-            for index, example in enumerate(description_examples):
-                if not example.get("input") and index < len(raw_examples):
-                    example["input"] = raw_examples[index]["input"]
-                elif params and example.get("input"):
-                    example["input"] = _normalize_example_input(example["input"], params)
+        for example in description_examples:
+            if example.get("input"):
+                example["input"] = _normalize_example_input(example["input"], params)
+
+        # GraphQL exampleTestcases is the most reliable source for raw argument
+        # values, but only use it when it splits into exactly one input block
+        # for every statement output. Otherwise it may contain every testcase
+        # in one block and must not overwrite a valid first statement example.
+        if raw_examples and len(raw_examples) == len(description_examples):
+            for example, raw_example in zip(description_examples, raw_examples):
+                if raw_example.get("input"):
+                    example["input"] = raw_example["input"]
         return [ex for ex in description_examples if ex.get("input") or ex.get("output")]
 
     return raw_examples
@@ -550,12 +559,45 @@ def _extract_examples_from_raw_testcases(example_text: str, params: list[str]) -
 def _normalize_label_text(text: str) -> str:
     text = html.unescape(text or "")
     text = text.replace("\r\n", "\n").replace("\r", "\n").replace("\xa0", " ")
+    # html_to_markdown() preserves emphasis/code markers. LeetCode commonly
+    # renders labels as <strong>Input:</strong>, producing "**Input:**".
+    # Normalize those labels before the example parser looks for sections.
+    labels = (
+        "输入",
+        "输出",
+        "解释",
+        "示例",
+        "约束",
+        "提示",
+        "Input",
+        "Output",
+        "Explanation",
+        "Example",
+        "Constraints",
+        "Note",
+    )
+    label_pattern = "|".join(re.escape(label) for label in labels)
+    text = re.sub(
+        rf"(?i)(?:\*\*|__)\s*({label_pattern})(?:\s+\d+)?\s*([:：])\s*(?:\*\*|__)",
+        r"\n\1\2 ",
+        text,
+    )
+    text = re.sub(
+        rf"(?i)`\s*({label_pattern})(?:\s+\d+)?\s*([:：])\s*`",
+        r"\n\1\2 ",
+        text,
+    )
+    text = re.sub(
+        rf"(?im)^([ \t]*)(?:\*\*|__)?[ \t]*({label_pattern})(?:[ \t]+\d+)?[ \t]*([:：])[ \t]*(?:\*\*|__)?",
+        r"\1\2\3 ",
+        text,
+    )
     text = re.sub(r"[ \t]+\n", "\n", text)
     return text.strip()
 
 
 def _normalize_example_input(value: str, params: Optional[list[str]] = None) -> str:
-    text = _normalize_label_text(value)
+    text = _strip_inline_markdown(_normalize_label_text(value))
     if not text:
         return ""
 
@@ -572,7 +614,7 @@ def _normalize_example_input(value: str, params: Optional[list[str]] = None) -> 
 
 
 def _normalize_example_output(value: str) -> str:
-    text = _normalize_label_text(value)
+    text = _strip_inline_markdown(_normalize_label_text(value))
     if not text:
         return ""
 
@@ -583,6 +625,28 @@ def _normalize_example_output(value: str) -> str:
             break
         lines.append(stripped)
     return "\n".join(lines).strip()
+
+
+def _strip_inline_markdown(value: str) -> str:
+    """Remove presentation-only Markdown wrappers from testcase values."""
+    text = (value or "").strip()
+    if not text:
+        return ""
+
+    text = re.sub(r"`([^`\n]+)`", r"\1", text)
+    text = re.sub(r"\*\*([^*\n]+)\*\*", r"\1", text)
+    text = re.sub(r"__([^_\n]+)__", r"\1", text)
+    return text.strip()
+
+
+def _infer_params_from_description_examples(examples: list[dict[str, str]]) -> list[str]:
+    """Infer argument names from statement inputs such as `s = ..., p = ...`."""
+    for example in examples:
+        text = _normalize_example_input(example.get("input", ""))
+        names = re.findall(r"(?m)^\s*([A-Za-z_]\w*)\s*=", text)
+        if names and len(names) == len(set(names)):
+            return names
+    return []
 
 
 def _extract_python_method_params(starter_code: str) -> list[str]:

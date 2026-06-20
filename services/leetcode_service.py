@@ -6,6 +6,7 @@ import gradio as gr
 
 from database import get_leetcode_problem, search_leetcode_problems
 from database.leetcode_client import LeetCodeClient
+from services.test_case_service import format_examples_for_ui
 from utils.languages import get_gradio_language, get_leetcode_slug
 
 
@@ -109,8 +110,7 @@ def load_leetcode_template(
             csrf_token=leetcode_csrf_token,
         )
         examples = problem.get("examples", [])
-        test_in = str(examples[0].get("input", "")) if examples else ""
-        test_out = str(examples[0].get("output", "")) if examples else ""
+        test_in, test_out = format_examples_for_ui(examples)
         desc = _format_leetcode_description(problem)
         status = f"已导入 LeetCode 题目：{problem.get('title', '')}"
         if (leetcode_session or leetcode_csrf_token) and status.startswith("已导入"):

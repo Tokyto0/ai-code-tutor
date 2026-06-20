@@ -49,12 +49,13 @@ class FakeSandboxRunner:
         self.calls.append({"code": code, "test_cases": test_cases})
         return [
             SimpleNamespace(
-                input_data=test_cases[0]["input"],
-                expected_output=test_cases[0]["expected"],
-                actual_output=test_cases[0]["expected"],
+                input_data=test_case["input"],
+                expected_output=test_case["expected"],
+                actual_output=test_case["expected"],
                 passed=True,
                 error="",
             )
+            for test_case in test_cases
         ]
 
 
@@ -189,6 +190,55 @@ def test_run_diagnosis_non_python_skips_ast_and_sandbox(monkeypatch):
     assert variants == []
     assert report_file == "fake-report.md"
     assert history_update == {"choices": ["history-1"], "value": "history-1"}
+
+
+def test_run_diagnosis_without_test_case_still_reports_sandbox_skip(monkeypatch):
+    force_report_flags(monkeypatch)
+    deps = make_deps()
+
+    report, status, variant_update, variants, report_file, history_update = run_with_deps(
+        deps,
+        test_input="",
+        test_expected="",
+        generate_variants=False,
+    )
+
+    assert deps.sandbox_runner.calls == []
+    assert deps.llm_diagnosis.diagnose_calls[0]["test_cases"] is None
+    assert deps.llm_diagnosis.diagnose_calls[0]["validation_results"] is None
+    assert "二、运行验证" in report
+    assert "未提供完整测试用例" in report
+    assert "已跳过沙箱验证" in report
+    assert "已跳过沙箱（未提供完整测试用例）" in status
+    assert variant_update["choices"] == []
+    assert variants == []
+    assert report_file == "fake-report.md"
+    assert history_update == {"choices": ["history-1"], "value": "history-1"}
+
+
+def test_run_diagnosis_parses_multiple_numbered_test_cases(monkeypatch):
+    force_report_flags(monkeypatch)
+    deps = make_deps()
+
+    run_with_deps(
+        deps,
+        test_input=(
+            '===== 测试用例 1 =====\ns = "aa"\np = "a"\n\n'
+            '===== 测试用例 2 =====\ns = "aa"\np = "a*"'
+        ),
+        test_expected=(
+            "===== 期望输出 1 =====\nfalse\n\n"
+            "===== 期望输出 2 =====\ntrue"
+        ),
+        generate_variants=False,
+    )
+
+    expected_cases = [
+        {"input": 's = "aa"\np = "a"', "expected": "false"},
+        {"input": 's = "aa"\np = "a*"', "expected": "true"},
+    ]
+    assert deps.sandbox_runner.calls[0]["test_cases"] == expected_cases
+    assert deps.llm_diagnosis.diagnose_calls[0]["test_cases"] == expected_cases
 
 
 def test_run_diagnosis_llm_exception_goes_into_report(monkeypatch):

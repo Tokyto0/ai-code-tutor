@@ -64,11 +64,11 @@ class MarkdownReportBuilder:
     # ---------- 错误诊断 ----------
     def add_error_diagnosis(self, error_analysis: str, fix_suggestion: str):
         self.diagnosis_section = ReportSection(
-            title="二、错误诊断",
+            title="三、错误诊断",
             content=error_analysis,
         )
         self.fix_section = ReportSection(
-            title="三、修复建议",
+            title="四、修复建议",
             content=fix_suggestion,
         )
         return self
@@ -77,7 +77,7 @@ class MarkdownReportBuilder:
     def add_sandbox_results(self, results: list[dict], skipped_reason: str = ""):
         if not results:
             self.sandbox_section = ReportSection(
-                title="四、运行验证",
+                title="二、运行验证",
                 content=skipped_reason or "未执行沙箱测试。",
             )
             return self
@@ -98,7 +98,7 @@ class MarkdownReportBuilder:
             lines.append("")
 
         self.sandbox_section = ReportSection(
-            title="四、运行验证（沙箱）",
+            title="二、运行验证（沙箱）",
             content="\n".join(lines),
         )
         return self
@@ -165,9 +165,9 @@ class MarkdownReportBuilder:
             sec
             for sec in [
                 self.ast_section,
+                self.sandbox_section,
                 self.diagnosis_section,
                 self.fix_section,
-                self.sandbox_section,
                 self.variant_section,
                 *self.extra_sections,
             ]
